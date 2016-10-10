@@ -55,6 +55,7 @@ var (
 	q0				float32 = 0.75
 	alpha			float64 = 0.1
 	beta			float64 = 2
+	hiwristic		float64 = 0
 )
 
 // New creates a new scheduler.
@@ -193,6 +194,7 @@ func (s *Scheduler) Run(ctx context.Context) error {
 		case <-s.stopChan:
 			return nil
 		}
+		s.updatePheromon()
 	}
 }
 
@@ -355,12 +357,16 @@ func (s *Scheduler) tick(ctx context.Context) {
 	}
 
 	_, failed := s.applySchedulingDecisions(ctx, schedulingDecisions)
+	if len(failed) == 0 {
+		hiwristic = 1
+	}
 	for _, decision := range failed {
 		s.allTasks[decision.old.ID] = decision.old
 
 		nodeInfo, err := s.nodeHeap.nodeInfo(decision.new.NodeID)
 		if err == nil && nodeInfo.removeTask(decision.new) {
 			s.nodeHeap.updateNode(nodeInfo)
+			hiwristic = 0
 		}
 
 		// enqueue task for next scheduling attempt
@@ -369,7 +375,6 @@ func (s *Scheduler) tick(ctx context.Context) {
 
 	s.antColony()
 	fmt.Println("===================================")
-	fmt.Println("City = ", citys)
 	for i := 0; i < len(citys); i++ {
 		fmt.Println("Info Ant[", i,"] =", citys[i], ", MemoryBytes =", citys[i].nodeInfo.AvailableResources.MemoryBytes/1024, ", index =", citys[i].index)
 	}
@@ -453,7 +458,8 @@ func (s *Scheduler) taskFitNode(ctx context.Context, t *api.Task, nodeID string)
 // scheduleTask schedules a single task.
 func (s *Scheduler) scheduleTask(ctx context.Context, t *api.Task) *api.Task {
 	s.pipeline.SetTask(t)
-	n, _ := s.nodeHeap.getNodeAntColony(s.pipeline.Process, citys)
+	hiwristic = math.Pow(float64(taskReservations(t.Spec).MemoryBytes), beta)
+	n, _ := s.nodeHeap.getNodeAntColony(s.pipeline.Process, citys, hiwristic)
 	if n == nil {
 		log.G(ctx).WithField("task.id", t.ID).Debug("No suitable node available for task")
 		return nil
@@ -479,7 +485,7 @@ func (s *Scheduler) scheduleTask(ctx context.Context, t *api.Task) *api.Task {
 func (s *Scheduler) antColony() error {
 	fmt.Println("Ant Colony")
 
-	errP := s.updatePheromon()
+	errP := s.updateCitys()
 	if errP != nil {
 		return errP
 	}
@@ -490,7 +496,7 @@ func (s *Scheduler) antColony() error {
 				break
 			}
 		}
-		errP := s.updatePheromon()
+		errP := s.updateCitys()
 		if errP != nil {
 			return errP
 		}
@@ -520,7 +526,7 @@ func (s *planetSorter) Less(i, j int) bool {
 	return s.by(&s.planets[i], &s.planets[j])
 }
 
-func (s *Scheduler) updatePheromon() error {
+func (s *Scheduler) updateCitys() error {
 	citys = make([]City, s.nodeHeap.Len())
 	for i := 0; i < s.nodeHeap.Len(); i++ {
 		citys[i].pheromon = math.Pow(float64(s.nodeHeap.heap[i].AvailableResources.MemoryBytes), alpha)
@@ -528,6 +534,20 @@ func (s *Scheduler) updatePheromon() error {
 		citys[i].index = i
 	}
 	return nil
+}
+
+func (s *Scheduler) updatePheromon() {
+	var max float64 = 0
+	var index int = 0
+	for i := 0; i < len(citys); i++ {
+		if max < citys[i].pheromon {
+			max = citys[i].pheromon
+			index = citys[i].index
+		}
+	}
+	for i := 0; i < s.nodeHeap.Len(); i++ {
+		citys[i].pheromon = (1 - alpha) * citys[i].pheromon + alpha * (1 / citys[index].pheromon)
+	}
 }
 
 func (s *Scheduler) buildNodeHeap(tx store.ReadTx, tasksByNode map[string]map[string]*api.Task) error {
