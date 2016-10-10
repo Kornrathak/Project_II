@@ -7,7 +7,6 @@ import (
 	"time"
 	"fmt"
 	"math"
-	"sort"
 
 	"github.com/docker/swarmkit/api"
 	"github.com/docker/swarmkit/log"
@@ -56,6 +55,8 @@ var (
 	alpha			float64 = 0.1
 	beta			float64 = 2
 	hiwristic		float64 = 0
+	max 			float64 = 0
+	index 			int 	= 0
 )
 
 // New creates a new scheduler.
@@ -458,7 +459,7 @@ func (s *Scheduler) taskFitNode(ctx context.Context, t *api.Task, nodeID string)
 // scheduleTask schedules a single task.
 func (s *Scheduler) scheduleTask(ctx context.Context, t *api.Task) *api.Task {
 	s.pipeline.SetTask(t)
-	hiwristic = math.Pow(float64(taskReservations(t.Spec).MemoryBytes), beta)
+	hiwristic = math.Pow(float64(hiwristic), beta)
 	n, _ := s.nodeHeap.getNodeAntColony(s.pipeline.Process, citys, hiwristic)
 	if n == nil {
 		log.G(ctx).WithField("task.id", t.ID).Debug("No suitable node available for task")
@@ -504,28 +505,6 @@ func (s *Scheduler) antColony() error {
 	return nil
 }
 
-type By func(p1, p2 *City) bool
-func (by By) Sort(planets []City) {
-	ps := &planetSorter{
-		planets: planets,
-		by:      by, // The Sort method's receiver is the function (closure) that defines the sort order.
-	}
-	sort.Sort(ps)
-}
-type planetSorter struct {
-	planets []City
-	by      func(p1, p2 *City) bool // Closure used in the Less method.
-}
-func (s *planetSorter) Len() int {
-	return len(s.planets)
-}
-func (s *planetSorter) Swap(i, j int) {
-	s.planets[i], s.planets[j] = s.planets[j], s.planets[i]
-}
-func (s *planetSorter) Less(i, j int) bool {
-	return s.by(&s.planets[i], &s.planets[j])
-}
-
 func (s *Scheduler) updateCitys() error {
 	citys = make([]City, s.nodeHeap.Len())
 	for i := 0; i < s.nodeHeap.Len(); i++ {
@@ -537,8 +516,9 @@ func (s *Scheduler) updateCitys() error {
 }
 
 func (s *Scheduler) updatePheromon() {
-	var max float64 = 0
-	var index int = 0
+	max = 0
+	index = 0
+	citys = make([]City, s.nodeHeap.Len())
 	for i := 0; i < len(citys); i++ {
 		if max < citys[i].pheromon {
 			max = citys[i].pheromon
