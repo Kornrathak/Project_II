@@ -194,7 +194,7 @@ func (s *Scheduler) Run(ctx context.Context) error {
 		case <-s.stopChan:
 			return nil
 		}
-		s.updatePheromon()
+		s.evaporationPheromon()
 	}
 }
 
@@ -486,7 +486,7 @@ func (s *Scheduler) updateCitys() {
 	}
 }
 
-func (s *Scheduler) updatePheromon() {
+func (s *Scheduler) evaporationPheromon() {
 	pheromon = 0
 	for _, c := range citys {
 		if pheromon < c.pheromon {
