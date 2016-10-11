@@ -54,7 +54,7 @@ var (
 	q0				float32 = 0.75
 	alpha			float64 = 0.1
 	beta			float64 = 2
-	hiwristic		float64 = 0
+	hiwristic		float64 = 1
 	max 			float64 = 0
 	index 			int 	= 0
 )
@@ -195,7 +195,7 @@ func (s *Scheduler) Run(ctx context.Context) error {
 		case <-s.stopChan:
 			return nil
 		}
-		s.updatePheromon()
+		//s.updatePheromon()
 	}
 }
 
@@ -460,6 +460,7 @@ func (s *Scheduler) taskFitNode(ctx context.Context, t *api.Task, nodeID string)
 func (s *Scheduler) scheduleTask(ctx context.Context, t *api.Task) *api.Task {
 	s.pipeline.SetTask(t)
 	hiwristic = math.Pow(float64(hiwristic), beta)
+	fmt.Println("hiwristic =", hiwristic)
 	n, _ := s.nodeHeap.getNodeAntColony(s.pipeline.Process, citys, hiwristic)
 	if n == nil {
 		log.G(ctx).WithField("task.id", t.ID).Debug("No suitable node available for task")
