@@ -96,16 +96,16 @@ func (nh *nodeHeap) findMin(meetsConstraints func(*NodeInfo) bool, scanAllNodes 
 	return nh.searchHeapToFindMin(meetsConstraints)
 }
 
-func (nh *nodeHeap) getNodeAntColony(meetsConstraints func(*NodeInfo) bool, citys []City, hiwristic float64) (*api.Node, int) {
+func (nh *nodeHeap) getNodeAntColony(meetsConstraints func(*NodeInfo) bool, citys map[string]City, hiwristic float64) (*api.Node, int) {
 	var bestNode *api.Node
 	var maxPheromon float64 = 0 * hiwristic
 	minTasks := int(^uint(0) >> 1) // max int
 
 	for i := 0; i < len(nh.heap); i++ {
 		heapEntry := &nh.heap[i]
-		if meetsConstraints(heapEntry) && ((citys[i].pheromon * hiwristic) > maxPheromon) {
+		if meetsConstraints(heapEntry) && ((citys[heapEntry.ID].pheromon * hiwristic) > maxPheromon) {
 			bestNode = heapEntry.Node
-			maxPheromon = citys[i].pheromon * hiwristic
+			maxPheromon = citys[heapEntry.ID].pheromon * hiwristic
 			minTasks = len(heapEntry.Tasks)
 		}
 	}
