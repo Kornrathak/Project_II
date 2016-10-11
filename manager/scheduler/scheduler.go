@@ -56,6 +56,7 @@ var (
 	hiwristic		float64 = 1
 	max 			float64 = 0
 	index 			int 	= 0
+	pheromon 		float64 = 0
 )
 
 // New creates a new scheduler.
@@ -193,7 +194,7 @@ func (s *Scheduler) Run(ctx context.Context) error {
 		case <-s.stopChan:
 			return nil
 		}
-		//s.updatePheromon()
+		s.updatePheromon()
 	}
 }
 
@@ -372,12 +373,7 @@ func (s *Scheduler) tick(ctx context.Context) {
 		s.enqueue(decision.old)
 	}
 
-	s.antColony()
-	fmt.Println("===================================")
-	for i := 0; i < s.nodeHeap.Len(); i++ {
-		fmt.Println("Info Ant[", i,"] =", citys[s.nodeHeap.heap[i].ID].pheromon, ", MemoryBytes =", citys[s.nodeHeap.heap[i].ID].nodeInfo.AvailableResources.MemoryBytes)
-	}
-	fmt.Println("===================================")
+	s.updateCitys()
 }
 
 func (s *Scheduler) applySchedulingDecisions(ctx context.Context, schedulingDecisions map[string]schedulingDecision) (successful, failed []schedulingDecision) {
@@ -481,44 +477,26 @@ func (s *Scheduler) scheduleTask(ctx context.Context, t *api.Task) *api.Task {
 	return &newT
 }
 
-func (s *Scheduler) antColony() error {
-	fmt.Println("Ant Colony")
-
-	errP := s.updateCitys()
-	if errP != nil {
-		return errP
-	}
-	
-	return nil
-}
-
-func (s *Scheduler) updateCitys() error {
+func (s *Scheduler) updateCitys() {
 	var city City
 	for i := 0; i < s.nodeHeap.Len(); i++ {
 		city.pheromon = math.Pow(float64(s.nodeHeap.heap[i].AvailableResources.MemoryBytes), alpha)
 		city.nodeInfo = &s.nodeHeap.heap[i]
 		citys[s.nodeHeap.heap[i].ID] = city 
 	}
-	return nil 
 }
 
-/*func (s *Scheduler) updatePheromon() error {
-	max = 0
-	index = 0
-	err := s.updateCitys()
-	if err != nil {
-		return err
-	}
-	for i := 0; i < len(citys); i++ {
-		if max < citys[i].pheromon {
-			max = citys[i].pheromon
-			index = citys[i].index
+func (s *Scheduler) updatePheromon() {
+	pheromon = 0
+	for _, c := range citys {
+		if pheromon < c.pheromon {
+			pheromon = c.pheromon
 		}
 	}
-	for i := 0; i < s.nodeHeap.Len(); i++ {
-		citys[i].pheromon = ((1 - alpha) * citys[i].pheromon) + (alpha * (1 / citys[index].pheromon))
+	for _, c := range citys {
+		c.pheromon = ((1 - alpha) * c.pheromon) + (alpha * (pheromon - c.pheromon))
 	}
-}*/
+}
 
 func (s *Scheduler) buildNodeHeap(tx store.ReadTx, tasksByNode map[string]map[string]*api.Task) error {
 	nodes, err := store.FindNodes(tx, store.All)
@@ -540,7 +518,7 @@ func (s *Scheduler) buildNodeHeap(tx store.ReadTx, tasksByNode map[string]map[st
 		i++
 	}
 	//heap.Init(&s.nodeHeap)			//Default
-	s.antColony()
+	s.updateCitys()
 
 	return nil
 }
