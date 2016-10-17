@@ -297,5 +297,7 @@ az8ias15auf6w11jndsk7bc2o    redis      2           redis:3.0.7    RUNNING      
 As you can see, every Task running on `node-1` was rebalanced to either `node-2` or `node-3` by the reconciliation loop.
 ----------------------------------------------------------------------------------------------------------------------------
 Modify : Add Ant Colony Algorithm
+
 Commit : 114f9b5
+
 Reference: https://github.com/docker/swarmkit
